@@ -12,8 +12,9 @@ module.exports = (req, res) => {
       const decoded = Buffer.from(encoded, "base64").toString("utf-8");
       const [u, p] = decoded.split(":");
       if (u === user && p === pass) {
+        const page = req.url === "/compare" ? "compare.html" : "demo.html";
         const html = fs.readFileSync(
-          path.join(__dirname, "..", "demo.html"),
+          path.join(__dirname, "..", page),
           "utf-8"
         );
         res.setHeader("Content-Type", "text/html");

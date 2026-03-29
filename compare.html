@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Whisper vs Amazon Transcribe - Comparison</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: #1a1a2e; color: #eee; min-height: 100vh; padding: 2rem; }
+        h1 { text-align: center; margin-bottom: 0.5rem; font-size: 1.5rem; }
+        .nav { text-align: center; margin-bottom: 1.5rem; }
+        .nav a { color: #4dd0e1; font-size: 0.85rem; }
+        .upload-section { max-width: 900px; margin: 0 auto 1.5rem; }
+        .upload-section label { display: block; font-size: 0.85rem; color: #aaa; margin-bottom: 0.3rem; }
+        .upload-row { display: flex; gap: 1rem; align-items: end; flex-wrap: wrap; }
+        .upload-row input[type="file"] { flex: 1; padding: 0.5rem; border-radius: 6px; border: 1px solid #444; background: #16213e; color: #eee; font-size: 0.9rem; }
+        .upload-row select, .upload-row textarea { padding: 0.5rem; border-radius: 6px; border: 1px solid #444; background: #16213e; color: #eee; font-size: 0.9rem; }
+        .upload-row textarea { width: 100%; min-height: 50px; resize: vertical; font-family: inherit; }
+        .context-row { margin-top: 0.8rem; }
+        .context-row label { display: flex; flex-direction: column; gap: 0.3rem; }
+        button { padding: 0.7rem 2rem; border-radius: 8px; border: none; font-size: 1rem; cursor: pointer; transition: all 0.2s; }
+        button:disabled { opacity: 0.4; cursor: not-allowed; }
+        .btn-primary { background: #e94560; color: white; }
+        .btn-primary:hover:not(:disabled) { background: #c73e54; }
+        .btn-llm { background: #0f3460; color: #4dd0e1; border: 1px solid #4dd0e1; padding: 0.5rem 1.5rem; font-size: 0.9rem; }
+        .btn-llm:hover:not(:disabled) { background: #1a4a7a; }
+        .controls { text-align: center; margin: 1rem 0; }
+        .status { text-align: center; margin-bottom: 1rem; padding: 0.5rem 1rem; border-radius: 6px; font-size: 0.85rem; display: inline-block; }
+        .status-row { text-align: center; margin-bottom: 1rem; }
+        .status.processing { background: #1b2e1b; color: #66bb6a; }
+        .status.done { background: #0f3460; color: #4dd0e1; }
+        .status.error { background: #2d1b2e; color: #e94560; }
+        .comparison { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; max-width: 900px; margin: 0 auto; }
+        .panel { background: #16213e; border-radius: 10px; padding: 1.5rem; border: 1px solid #333; }
+        .panel h2 { font-size: 1rem; margin-bottom: 0.8rem; display: flex; align-items: center; gap: 0.5rem; }
+        .panel h2 .badge { font-size: 0.7rem; padding: 0.2rem 0.5rem; border-radius: 4px; }
+        .badge-whisper { background: #e94560; color: white; }
+        .badge-transcribe { background: #f5a623; color: #1a1a2e; }
+        .result-box { background: #1a1a2e; border-radius: 6px; padding: 1rem; min-height: 150px; line-height: 1.8; font-size: 0.95rem; white-space: pre-wrap; }
+        .result-box.placeholder { color: #666; display: flex; align-items: center; justify-content: center; }
+        .meta { font-size: 0.75rem; color: #888; margin-top: 0.5rem; }
+        .llm-row { margin-top: 0.8rem; }
+        .llm-result { background: #0a1628; border-radius: 6px; padding: 1rem; min-height: 100px; line-height: 1.8; font-size: 0.95rem; white-space: pre-wrap; border: 1px solid #4dd0e1; margin-top: 0.5rem; display: none; }
+        .llm-label { font-size: 0.8rem; color: #4dd0e1; margin-top: 0.5rem; display: none; }
+        @media (max-width: 768px) {
+            .comparison { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <h1>ASR Accuracy Comparison</h1>
+    <div class="nav"><a href="/">Realtime Demo</a></div>
+
+    <div class="upload-section">
+        <div class="upload-row">
+            <div style="flex:1">
+                <label>Audio File</label>
+                <input type="file" id="audioFile" accept="audio/*,.wav,.mp3,.m4a,.flac,.ogg">
+            </div>
+            <div>
+                <label>Language</label>
+                <select id="language">
+                    <option value="ja">Japanese</option>
+                    <option value="en">English</option>
+                    <option value="">Auto</option>
+                </select>
+            </div>
+        </div>
+        <div class="context-row">
+            <label>
+                Initial Prompt / LLM補正の前提
+                <textarea id="context" placeholder="例: 整形外科の外来診察の録音。医師と患者の会話。"></textarea>
+            </label>
+        </div>
+    </div>
+
+    <div class="controls">
+        <button class="btn-primary" id="transcribeBtn" onclick="runComparison()">Transcribe</button>
+    </div>
+
+    <div class="status-row">
+        <span class="status" id="status" style="display:none;"></span>
+    </div>
+
+    <div class="comparison">
+        <!-- Whisper Panel -->
+        <div class="panel">
+            <h2><span class="badge badge-whisper">Whisper</span> Large V3 + GPU</h2>
+            <div class="result-box placeholder" id="whisperResult">Upload audio to see results</div>
+            <div class="meta" id="whisperMeta"></div>
+            <div class="llm-row">
+                <button class="btn-llm" id="whisperLlmBtn" onclick="correctWithLLM('whisper')" disabled>LLM補正</button>
+                <div class="llm-label" id="whisperLlmLabel">LLM補正結果:</div>
+                <div class="llm-result" id="whisperLlmResult"></div>
+                <div class="meta" id="whisperLlmMeta"></div>
+            </div>
+        </div>
+
+        <!-- Amazon Transcribe Panel -->
+        <div class="panel">
+            <h2><span class="badge badge-transcribe">Transcribe</span> Amazon + Custom Vocab</h2>
+            <div class="result-box placeholder" id="transcribeResult">Coming soon - AWS credentials required</div>
+            <div class="meta" id="transcribeMeta"></div>
+            <div class="llm-row">
+                <button class="btn-llm" id="transcribeLlmBtn" onclick="correctWithLLM('transcribe')" disabled>LLM補正</button>
+                <div class="llm-label" id="transcribeLlmLabel">LLM補正結果:</div>
+                <div class="llm-result" id="transcribeLlmResult"></div>
+                <div class="meta" id="transcribeLlmMeta"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const MODAL_BASE = 'https://tanimutomo--whisper-realtime-api-whisperapi-web.modal.run';
+
+        function setStatus(text, className) {
+            const el = document.getElementById('status');
+            el.textContent = text;
+            el.className = 'status ' + className;
+            el.style.display = text ? 'inline-block' : 'none';
+        }
+
+        async function runComparison() {
+            const fileInput = document.getElementById('audioFile');
+            if (!fileInput.files.length) {
+                setStatus('Please select an audio file', 'error');
+                return;
+            }
+
+            const file = fileInput.files[0];
+            const language = document.getElementById('language').value;
+            const context = document.getElementById('context').value.trim();
+
+            document.getElementById('transcribeBtn').disabled = true;
+            setStatus('Whisper processing...', 'processing');
+
+            // Reset results
+            document.getElementById('whisperResult').textContent = '';
+            document.getElementById('whisperResult').className = 'result-box';
+            document.getElementById('whisperMeta').textContent = '';
+            document.getElementById('whisperLlmBtn').disabled = true;
+
+            // --- Whisper ---
+            try {
+                const formData = new FormData();
+                formData.append('file', file);
+                if (language) formData.append('language', language);
+                if (context) formData.append('initial_prompt', context);
+
+                const resp = await fetch(`${MODAL_BASE}/transcribe`, {
+                    method: 'POST',
+                    body: formData,
+                });
+                const data = await resp.json();
+
+                document.getElementById('whisperResult').textContent = data.text;
+                document.getElementById('whisperMeta').textContent =
+                    `Processing: ${data.processing_time_s}s | Audio: ${data.audio_duration_s}s`;
+                document.getElementById('whisperLlmBtn').disabled = false;
+
+                // Store raw text for LLM correction
+                document.getElementById('whisperResult').dataset.rawText = data.text;
+            } catch (err) {
+                document.getElementById('whisperResult').textContent = 'Error: ' + err.message;
+                document.getElementById('whisperResult').className = 'result-box';
+            }
+
+            // --- Amazon Transcribe (placeholder) ---
+            // TODO: Implement when AWS credentials are available
+            // setStatus('Amazon Transcribe processing...', 'processing');
+            // const transcribeResp = await fetch(`${MODAL_BASE}/transcribe-aws`, ...);
+
+            setStatus('Done', 'done');
+            document.getElementById('transcribeBtn').disabled = false;
+        }
+
+        async function correctWithLLM(engine) {
+            const btn = document.getElementById(`${engine}LlmBtn`);
+            const resultEl = document.getElementById(`${engine}LlmResult`);
+            const labelEl = document.getElementById(`${engine}LlmLabel`);
+            const metaEl = document.getElementById(`${engine}LlmMeta`);
+            const rawText = document.getElementById(`${engine}Result`).dataset.rawText;
+            const context = document.getElementById('context').value.trim();
+
+            if (!rawText) return;
+
+            btn.disabled = true;
+            btn.textContent = 'LLM補正中...';
+
+            try {
+                const resp = await fetch(`${MODAL_BASE}/correct`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text: rawText, context: context || null }),
+                });
+                const data = await resp.json();
+
+                resultEl.textContent = data.text;
+                resultEl.style.display = 'block';
+                labelEl.style.display = 'block';
+                metaEl.textContent = `LLM: ${data.llm_time_s}s`;
+            } catch (err) {
+                resultEl.textContent = 'Error: ' + err.message;
+                resultEl.style.display = 'block';
+                labelEl.style.display = 'block';
+            }
+
+            btn.textContent = 'LLM補正';
+            btn.disabled = false;
+        }
+    </script>
+</body>
+</html>
