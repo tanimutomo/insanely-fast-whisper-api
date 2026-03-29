@@ -93,7 +93,6 @@
     <div class="controls">
         <button id="startBtn" onclick="startRecording()">Start Recording</button>
         <button id="stopBtn" onclick="stopRecording()" disabled>Stop</button>
-        <button id="correctBtn" onclick="correctWithLLM()" disabled style="background: #0f3460; color: #4dd0e1; border: 1px solid #4dd0e1;">LLM補正</button>
     </div>
 
     <div id="status" class="status disconnected">Disconnected</div>
@@ -101,6 +100,10 @@
     <div class="transcript-container">
         <div style="font-size: 0.85rem; color: #aaa; margin-bottom: 0.3rem;">Whisper 文字起こし</div>
         <div class="transcript-box" id="transcriptBox"></div>
+    </div>
+
+    <div style="margin-top: 1rem; margin-bottom: 1rem;">
+        <button id="correctBtn" onclick="correctWithLLM()" disabled style="padding: 0.7rem 2rem; border-radius: 8px; border: 1px solid #4dd0e1; background: #0f3460; color: #4dd0e1; font-size: 1rem; cursor: pointer;">LLM補正</button>
     </div>
 
     <div class="transcript-container" id="llmResultContainer" style="display: none; margin-top: 1rem;">
