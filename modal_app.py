@@ -22,6 +22,43 @@ model_volume = modal.Volume.from_name("whisper-model-cache", create_if_missing=T
 GPU = "A10G"
 MODEL_NAME = "openai/whisper-large-v3"
 
+# Hallucination filter: common phrases Whisper generates on silence/noise
+HALLUCINATION_PATTERNS = [
+    "ご視聴ありがとうございました",
+    "ご協力ありがとうございました",
+    "ありがとうございました",
+    "チャンネル登録",
+    "お疲れ様でした",
+    "よろしくお願いします",
+    "おやすみなさい",
+    "では、また",
+    "字幕",
+    "Subtitles",
+    "Thank you",
+    "Thanks for watching",
+]
+
+
+def clean_transcription(text, initial_prompt=None):
+    """Remove hallucinated phrases and prompt leakage from transcription."""
+    if not text or not text.strip():
+        return ""
+
+    cleaned = text.strip()
+
+    # Remove prompt text that leaked into the output
+    if initial_prompt:
+        for sentence in initial_prompt.replace("。", "\n").replace("、", "\n").split("\n"):
+            sentence = sentence.strip()
+            if len(sentence) > 5 and sentence in cleaned:
+                cleaned = cleaned.replace(sentence, "")
+
+    # Remove known hallucination patterns
+    for pattern in HALLUCINATION_PATTERNS:
+        cleaned = cleaned.replace(pattern, "")
+
+    return cleaned.strip()
+
 
 @app.cls(
     image=image,
@@ -46,13 +83,43 @@ class WhisperAPI:
             device="cuda:0",
             model_kwargs={"attn_implementation": "sdpa"},
         )
-        self.processor = self.pipe.tokenizer
         print(f"Model {MODEL_NAME} loaded on {GPU}", flush=True)
+
+    def _build_generate_kwargs(self, language=None, initial_prompt=None):
+        kwargs = {"task": "transcribe"}
+        if language:
+            kwargs["language"] = language
+        if initial_prompt:
+            prompt_ids = self.pipe.tokenizer.get_prompt_ids(initial_prompt, return_tensors="pt")
+            kwargs["prompt_ids"] = prompt_ids.to(self.pipe.device)
+        return kwargs
+
+    def _transcribe(self, audio, generate_kwargs, initial_prompt=None):
+        import time
+
+        start = time.time()
+        result = self.pipe(
+            audio,
+            chunk_length_s=30,
+            batch_size=24,
+            generate_kwargs=generate_kwargs,
+            return_timestamps=True,
+        )
+        elapsed = time.time() - start
+
+        # Clean up the transcription
+        cleaned_text = clean_transcription(result["text"], initial_prompt)
+        cleaned_chunks = []
+        for chunk in result.get("chunks", []):
+            cleaned = clean_transcription(chunk["text"], initial_prompt)
+            if cleaned:
+                cleaned_chunks.append({"timestamp": chunk["timestamp"], "text": cleaned})
+
+        return cleaned_text, cleaned_chunks, elapsed
 
     @modal.asgi_app()
     def web(self):
         import io
-        import time
         import numpy as np
         from fastapi import FastAPI, WebSocket, WebSocketDisconnect, UploadFile, File, Form
         from fastapi.responses import JSONResponse
@@ -75,26 +142,14 @@ class WhisperAPI:
             audio_array, sr = librosa.load(io.BytesIO(audio_bytes), sr=16000, mono=True)
             duration = len(audio_array) / 16000
 
-            generate_kwargs = {"task": "transcribe"}
-            if language:
-                generate_kwargs["language"] = language
-            if initial_prompt:
-                prompt_ids = self.pipe.tokenizer.get_prompt_ids(initial_prompt, return_tensors="pt")
-                generate_kwargs["prompt_ids"] = prompt_ids
-
-            start = time.time()
-            result = self.pipe(
-                audio_array,
-                chunk_length_s=30,
-                batch_size=24,
-                generate_kwargs=generate_kwargs,
-                return_timestamps=True,
+            generate_kwargs = self._build_generate_kwargs(language, initial_prompt)
+            cleaned_text, cleaned_chunks, elapsed = self._transcribe(
+                audio_array, generate_kwargs, initial_prompt
             )
-            elapsed = time.time() - start
 
             return JSONResponse({
-                "text": result["text"],
-                "chunks": result.get("chunks", []),
+                "text": cleaned_text,
+                "chunks": cleaned_chunks,
                 "processing_time_s": round(elapsed, 2),
                 "audio_duration_s": round(duration, 2),
             })
@@ -105,7 +160,7 @@ class WhisperAPI:
 
             config = await ws.receive_json()
             language = config.get("language")
-            buffer_seconds = config.get("buffer_seconds", 5)
+            buffer_seconds = config.get("buffer_seconds", 10)
             input_sample_rate = config.get("sample_rate", 16000)
             initial_prompt = config.get("initial_prompt")
 
@@ -113,15 +168,7 @@ class WhisperAPI:
 
             audio_buffer = np.array([], dtype=np.float32)
             buffer_threshold = int(16000 * buffer_seconds)
-
-            def build_generate_kwargs():
-                kwargs = {"task": "transcribe"}
-                if language:
-                    kwargs["language"] = language
-                if initial_prompt:
-                    prompt_ids = self.pipe.tokenizer.get_prompt_ids(initial_prompt, return_tensors="pt")
-                    kwargs["prompt_ids"] = prompt_ids.to(self.pipe.device)
-                return kwargs
+            generate_kwargs = self._build_generate_kwargs(language, initial_prompt)
 
             try:
                 while True:
@@ -135,35 +182,28 @@ class WhisperAPI:
                     audio_buffer = np.concatenate([audio_buffer, chunk])
 
                     if len(audio_buffer) >= buffer_threshold:
-                        start = time.time()
-                        result = self.pipe(
-                            audio_buffer,
-                            chunk_length_s=30,
-                            batch_size=24,
-                            generate_kwargs=build_generate_kwargs(),
-                            return_timestamps=True,
+                        cleaned_text, cleaned_chunks, elapsed = self._transcribe(
+                            audio_buffer, generate_kwargs, initial_prompt
                         )
-                        elapsed = time.time() - start
 
-                        await ws.send_json({
-                            "type": "transcription",
-                            "text": result["text"],
-                            "chunks": result.get("chunks", []),
-                            "processing_time_s": round(elapsed, 2),
-                            "audio_duration_s": round(len(audio_buffer) / 16000, 2),
-                        })
+                        # Only send if there's actual content
+                        if cleaned_text:
+                            await ws.send_json({
+                                "type": "transcription",
+                                "text": cleaned_text,
+                                "chunks": cleaned_chunks,
+                                "processing_time_s": round(elapsed, 2),
+                                "audio_duration_s": round(len(audio_buffer) / 16000, 2),
+                            })
 
                         audio_buffer = np.array([], dtype=np.float32)
 
             except WebSocketDisconnect:
                 if len(audio_buffer) > 16000:
-                    result = self.pipe(
-                        audio_buffer,
-                        chunk_length_s=30,
-                        batch_size=24,
-                        generate_kwargs=build_generate_kwargs(),
-                        return_timestamps=True,
+                    cleaned_text, _, _ = self._transcribe(
+                        audio_buffer, generate_kwargs, initial_prompt
                     )
-                    print(f"Final transcription: {result['text']}", flush=True)
+                    if cleaned_text:
+                        print(f"Final transcription: {cleaned_text}", flush=True)
 
         return web_app
