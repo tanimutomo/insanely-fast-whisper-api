@@ -45,7 +45,8 @@ def transcribe_audio(audio_array: np.ndarray, language: str | None = None, initi
     if language:
         generate_kwargs["language"] = language
     if initial_prompt:
-        generate_kwargs["prompt"] = initial_prompt
+        prompt_ids = pipe.tokenizer.get_prompt_ids(initial_prompt, return_tensors="pt")
+        generate_kwargs["prompt_ids"] = prompt_ids
 
     result = pipe(
         audio_array,

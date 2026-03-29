@@ -46,6 +46,7 @@ class WhisperAPI:
             device="cuda:0",
             model_kwargs={"attn_implementation": "sdpa"},
         )
+        self.processor = self.pipe.tokenizer
         print(f"Model {MODEL_NAME} loaded on {GPU}", flush=True)
 
     @modal.asgi_app()
@@ -78,7 +79,8 @@ class WhisperAPI:
             if language:
                 generate_kwargs["language"] = language
             if initial_prompt:
-                generate_kwargs["prompt"] = initial_prompt
+                prompt_ids = self.pipe.tokenizer.get_prompt_ids(initial_prompt, return_tensors="pt")
+                generate_kwargs["prompt_ids"] = prompt_ids
 
             start = time.time()
             result = self.pipe(
@@ -117,7 +119,8 @@ class WhisperAPI:
                 if language:
                     kwargs["language"] = language
                 if initial_prompt:
-                    kwargs["prompt"] = initial_prompt
+                    prompt_ids = self.pipe.tokenizer.get_prompt_ids(initial_prompt, return_tensors="pt")
+                    kwargs["prompt_ids"] = prompt_ids
                 return kwargs
 
             try:
