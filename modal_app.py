@@ -277,6 +277,8 @@ class WhisperAPI:
 
             audio_buffer = np.array([], dtype=np.float32)
             buffer_threshold = int(16000 * buffer_seconds)
+            overlap_seconds = 2
+            overlap_samples = int(16000 * overlap_seconds)
             generate_kwargs = self._build_generate_kwargs(language, initial_prompt)
 
             try:
@@ -305,7 +307,11 @@ class WhisperAPI:
                                 "audio_duration_s": round(len(audio_buffer) / 16000, 2),
                             })
 
-                        audio_buffer = np.array([], dtype=np.float32)
+                        # Keep last N seconds as overlap for next chunk
+                        if len(audio_buffer) > overlap_samples:
+                            audio_buffer = audio_buffer[-overlap_samples:]
+                        else:
+                            audio_buffer = np.array([], dtype=np.float32)
 
             except WebSocketDisconnect:
                 if len(audio_buffer) > 16000:
