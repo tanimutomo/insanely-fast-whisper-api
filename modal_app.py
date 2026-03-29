@@ -14,6 +14,7 @@ image = (
         "soundfile",
         "numpy",
         "python-multipart",
+        "anthropic",
     )
 )
 
@@ -38,6 +39,16 @@ HALLUCINATION_PATTERNS = [
     "Thanks for watching",
 ]
 
+LLM_CORRECTION_PROMPT = """\
+あなたは医療文書の校正者です。音声認識（Whisper）で文字起こしされたテキストを受け取り、誤認識を修正してください。
+
+## ルール
+- 医療用語の誤認識を正しい用語に修正してください（例: 「代替歯頭筋」→「大腿四頭筋」、「知覚どんま」→「知覚鈍麻」）
+- 文の意味が通るように句読点や区切りを整えてください
+- 元の発言の意味を変えないでください。言い回しの変更や要約はしないでください
+- 明らかな誤認識だけを修正し、正しく認識されている部分はそのまま残してください
+- 修正後のテキストのみを出力してください。説明や注釈は不要です"""
+
 
 def clean_transcription(text, initial_prompt=None):
     """Remove hallucinated phrases and prompt leakage from transcription."""
@@ -60,10 +71,36 @@ def clean_transcription(text, initial_prompt=None):
     return cleaned.strip()
 
 
+def correct_with_llm(text, context=None):
+    """Use Claude to correct medical terminology in transcription."""
+    import anthropic
+    import os
+
+    if not text or not text.strip():
+        return text
+
+    client = anthropic.Anthropic()
+
+    user_message = ""
+    if context:
+        user_message += f"## 録音の前提\n{context}\n\n"
+    user_message += f"## 文字起こしテキスト\n{text}"
+
+    response = client.messages.create(
+        model="claude-sonnet-4-20250514",
+        max_tokens=2048,
+        system=LLM_CORRECTION_PROMPT,
+        messages=[{"role": "user", "content": user_message}],
+    )
+
+    return response.content[0].text.strip()
+
+
 @app.cls(
     image=image,
     gpu=GPU,
     volumes={"/model-cache": model_volume},
+    secrets=[modal.Secret.from_name("anthropic-api-key")],
     scaledown_window=300,
     timeout=600,
 )
@@ -94,7 +131,7 @@ class WhisperAPI:
             kwargs["prompt_ids"] = prompt_ids.to(self.pipe.device)
         return kwargs
 
-    def _transcribe(self, audio, generate_kwargs, initial_prompt=None):
+    def _transcribe(self, audio, generate_kwargs, initial_prompt=None, use_llm=False, context=None):
         import time
 
         start = time.time()
@@ -105,7 +142,7 @@ class WhisperAPI:
             generate_kwargs=generate_kwargs,
             return_timestamps=True,
         )
-        elapsed = time.time() - start
+        whisper_elapsed = time.time() - start
 
         # Clean up the transcription
         cleaned_text = clean_transcription(result["text"], initial_prompt)
@@ -115,7 +152,22 @@ class WhisperAPI:
             if cleaned:
                 cleaned_chunks.append({"timestamp": chunk["timestamp"], "text": cleaned})
 
-        return cleaned_text, cleaned_chunks, elapsed
+        # LLM correction
+        corrected_text = cleaned_text
+        llm_elapsed = 0
+        if use_llm and cleaned_text:
+            start = time.time()
+            corrected_text = correct_with_llm(cleaned_text, context)
+            llm_elapsed = time.time() - start
+
+        return {
+            "raw_text": cleaned_text,
+            "text": corrected_text,
+            "chunks": cleaned_chunks,
+            "whisper_time_s": round(whisper_elapsed, 2),
+            "llm_time_s": round(llm_elapsed, 2),
+            "processing_time_s": round(whisper_elapsed + llm_elapsed, 2),
+        }
 
     @modal.asgi_app()
     def web(self):
@@ -135,6 +187,8 @@ class WhisperAPI:
             file: UploadFile = File(...),
             language: str = Form(default=None),
             initial_prompt: str = Form(default=None),
+            use_llm: bool = Form(default=False),
+            context: str = Form(default=None),
         ):
             import librosa
 
@@ -143,14 +197,18 @@ class WhisperAPI:
             duration = len(audio_array) / 16000
 
             generate_kwargs = self._build_generate_kwargs(language, initial_prompt)
-            cleaned_text, cleaned_chunks, elapsed = self._transcribe(
-                audio_array, generate_kwargs, initial_prompt
+            result = self._transcribe(
+                audio_array, generate_kwargs, initial_prompt,
+                use_llm=use_llm, context=context,
             )
 
             return JSONResponse({
-                "text": cleaned_text,
-                "chunks": cleaned_chunks,
-                "processing_time_s": round(elapsed, 2),
+                "text": result["text"],
+                "raw_text": result["raw_text"],
+                "chunks": result["chunks"],
+                "processing_time_s": result["processing_time_s"],
+                "whisper_time_s": result["whisper_time_s"],
+                "llm_time_s": result["llm_time_s"],
                 "audio_duration_s": round(duration, 2),
             })
 
@@ -163,6 +221,8 @@ class WhisperAPI:
             buffer_seconds = config.get("buffer_seconds", 10)
             input_sample_rate = config.get("sample_rate", 16000)
             initial_prompt = config.get("initial_prompt")
+            use_llm = config.get("use_llm", False)
+            context = config.get("context")
 
             await ws.send_json({"type": "ready", "message": "Send audio chunks as binary"})
 
@@ -182,17 +242,20 @@ class WhisperAPI:
                     audio_buffer = np.concatenate([audio_buffer, chunk])
 
                     if len(audio_buffer) >= buffer_threshold:
-                        cleaned_text, cleaned_chunks, elapsed = self._transcribe(
-                            audio_buffer, generate_kwargs, initial_prompt
+                        result = self._transcribe(
+                            audio_buffer, generate_kwargs, initial_prompt,
+                            use_llm=use_llm, context=context,
                         )
 
-                        # Only send if there's actual content
-                        if cleaned_text:
+                        if result["text"]:
                             await ws.send_json({
                                 "type": "transcription",
-                                "text": cleaned_text,
-                                "chunks": cleaned_chunks,
-                                "processing_time_s": round(elapsed, 2),
+                                "text": result["text"],
+                                "raw_text": result["raw_text"],
+                                "chunks": result["chunks"],
+                                "processing_time_s": result["processing_time_s"],
+                                "whisper_time_s": result["whisper_time_s"],
+                                "llm_time_s": result["llm_time_s"],
                                 "audio_duration_s": round(len(audio_buffer) / 16000, 2),
                             })
 
@@ -200,10 +263,11 @@ class WhisperAPI:
 
             except WebSocketDisconnect:
                 if len(audio_buffer) > 16000:
-                    cleaned_text, _, _ = self._transcribe(
-                        audio_buffer, generate_kwargs, initial_prompt
+                    result = self._transcribe(
+                        audio_buffer, generate_kwargs, initial_prompt,
+                        use_llm=use_llm, context=context,
                     )
-                    if cleaned_text:
-                        print(f"Final transcription: {cleaned_text}", flush=True)
+                    if result["text"]:
+                        print(f"Final transcription: {result['text']}", flush=True)
 
         return web_app
