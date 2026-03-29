@@ -265,6 +265,8 @@ class WhisperAPI:
 
         @web_app.websocket("/ws/transcribe")
         async def websocket_transcribe(ws: WebSocket):
+            import asyncio
+
             await ws.accept()
 
             config = await ws.receive_json()
@@ -280,45 +282,70 @@ class WhisperAPI:
             overlap_seconds = 2
             overlap_samples = int(16000 * overlap_seconds)
             generate_kwargs = self._build_generate_kwargs(language, initial_prompt)
+            is_transcribing = False
+            disconnected = False
 
-            try:
-                while True:
-                    data = await ws.receive_bytes()
-                    chunk = np.frombuffer(data, dtype=np.int16).astype(np.float32) / 32768.0
+            async def receive_audio():
+                nonlocal audio_buffer, disconnected
+                try:
+                    while not disconnected:
+                        data = await ws.receive_bytes()
+                        chunk = np.frombuffer(data, dtype=np.int16).astype(np.float32) / 32768.0
 
-                    if input_sample_rate != 16000:
-                        import librosa
-                        chunk = librosa.resample(chunk, orig_sr=input_sample_rate, target_sr=16000)
+                        if input_sample_rate != 16000:
+                            import librosa
+                            chunk = librosa.resample(chunk, orig_sr=input_sample_rate, target_sr=16000)
 
-                    audio_buffer = np.concatenate([audio_buffer, chunk])
+                        audio_buffer = np.concatenate([audio_buffer, chunk])
+                except WebSocketDisconnect:
+                    disconnected = True
 
-                    if len(audio_buffer) >= buffer_threshold:
-                        result = self._transcribe(
-                            audio_buffer, generate_kwargs, initial_prompt,
-                            use_llm=False,
-                        )
-
-                        if result["text"]:
-                            await ws.send_json({
-                                "type": "transcription",
-                                "text": result["text"],
-                                "chunks": result["chunks"],
-                                "processing_time_s": result["processing_time_s"],
-                                "audio_duration_s": round(len(audio_buffer) / 16000, 2),
-                            })
-
-                        # Keep last N seconds as overlap for next chunk
+            async def process_audio():
+                nonlocal audio_buffer, is_transcribing, disconnected
+                while not disconnected:
+                    if len(audio_buffer) >= buffer_threshold and not is_transcribing:
+                        is_transcribing = True
+                        # Snapshot the buffer for transcription
+                        transcribe_buffer = audio_buffer.copy()
+                        # Keep overlap for next chunk
                         if len(audio_buffer) > overlap_samples:
                             audio_buffer = audio_buffer[-overlap_samples:]
                         else:
                             audio_buffer = np.array([], dtype=np.float32)
 
-            except WebSocketDisconnect:
+                        # Run transcription in thread to not block event loop
+                        result = await asyncio.get_event_loop().run_in_executor(
+                            None,
+                            lambda: self._transcribe(
+                                transcribe_buffer, generate_kwargs, initial_prompt,
+                                use_llm=False,
+                            ),
+                        )
+
+                        if result["text"] and not disconnected:
+                            try:
+                                await ws.send_json({
+                                    "type": "transcription",
+                                    "text": result["text"],
+                                    "chunks": result["chunks"],
+                                    "processing_time_s": result["processing_time_s"],
+                                    "audio_duration_s": round(len(transcribe_buffer) / 16000, 2),
+                                })
+                            except Exception:
+                                pass
+
+                        is_transcribing = False
+                    else:
+                        await asyncio.sleep(0.1)
+
+                # Process remaining buffer on disconnect
                 if len(audio_buffer) > 16000:
                     result = self._transcribe(
                         audio_buffer, generate_kwargs, initial_prompt,
                     )
                     if result["text"]:
                         print(f"Final transcription: {result['text']}", flush=True)
+
+            await asyncio.gather(receive_audio(), process_audio())
 
         return web_app
