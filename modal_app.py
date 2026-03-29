@@ -120,7 +120,7 @@ class WhisperAPI:
                     kwargs["language"] = language
                 if initial_prompt:
                     prompt_ids = self.pipe.tokenizer.get_prompt_ids(initial_prompt, return_tensors="pt")
-                    kwargs["prompt_ids"] = prompt_ids
+                    kwargs["prompt_ids"] = prompt_ids.to(self.pipe.device)
                 return kwargs
 
             try:
