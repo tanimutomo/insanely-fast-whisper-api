@@ -84,12 +84,8 @@
     </div>
 
     <div class="llm-section">
-        <div class="llm-toggle">
-            <input type="checkbox" id="useLlm" checked>
-            <label for="useLlm">LLM後処理で医療用語を補正（Claude）</label>
-        </div>
         <label>
-            補正の前提（LLMに伝える録音の状況）
+            LLM補正の前提（Claudeに伝える録音の状況）
             <textarea id="llmContext" placeholder="例: 整形外科の外来診察で、腰痛の患者を診察しています。"></textarea>
         </label>
     </div>
@@ -97,6 +93,7 @@
     <div class="controls">
         <button id="startBtn" onclick="startRecording()">Start Recording</button>
         <button id="stopBtn" onclick="stopRecording()" disabled>Stop</button>
+        <button id="correctBtn" onclick="correctWithLLM()" disabled style="background: #0f3460; color: #4dd0e1; border: 1px solid #4dd0e1;">LLM補正</button>
     </div>
 
     <div id="status" class="status disconnected">Disconnected</div>
@@ -173,8 +170,6 @@
             const language = document.getElementById('language').value;
             const bufferSeconds = parseInt(document.getElementById('bufferSeconds').value);
             const initialPrompt = document.getElementById('initialPrompt').value.trim();
-            const useLlm = document.getElementById('useLlm').checked;
-            const llmContext = document.getElementById('llmContext').value.trim();
 
             document.getElementById('startBtn').disabled = true;
             document.getElementById('stopBtn').disabled = false;
@@ -206,8 +201,6 @@
                             buffer_seconds: bufferSeconds,
                             sample_rate: TARGET_SAMPLE_RATE,
                             initial_prompt: initialPrompt || null,
-                            use_llm: useLlm,
-                            context: llmContext || null,
                         }));
                     };
 
@@ -219,11 +212,7 @@
                             startAudioProcessing();
                             resolve();
                         } else if (data.type === 'transcription') {
-                            const showRaw = data.raw_text && data.raw_text !== data.text;
-                            const meta = data.llm_time_s
-                                ? `Whisper: ${data.whisper_time_s}s | LLM: ${data.llm_time_s}s | Audio: ${data.audio_duration_s}s`
-                                : `Processing: ${data.processing_time_s}s | Audio: ${data.audio_duration_s}s`;
-                            addTranscript(data.text, meta, showRaw ? data.raw_text : null);
+                            addTranscript(data.text, `Whisper: ${data.processing_time_s}s | Audio: ${data.audio_duration_s}s`);
                             setStatus('Recording...', 'recording');
                         }
                     };
@@ -302,7 +291,58 @@
 
             document.getElementById('startBtn').disabled = false;
             document.getElementById('stopBtn').disabled = true;
+            // Enable LLM correction button if there's transcription content
+            const box = document.getElementById('transcriptBox');
+            if (box.children.length > 0) {
+                document.getElementById('correctBtn').disabled = false;
+            }
             setStatus('Disconnected', 'disconnected');
+        }
+
+        async function correctWithLLM() {
+            const btn = document.getElementById('correctBtn');
+            btn.disabled = true;
+            btn.textContent = 'LLM補正中...';
+            setStatus('LLM補正中...', 'connected');
+
+            const box = document.getElementById('transcriptBox');
+            const entries = box.querySelectorAll('.transcript-entry');
+
+            // Collect all transcription text
+            const allText = Array.from(entries).map(e => e.querySelector('.text').textContent).join('');
+            const context = document.getElementById('llmContext').value.trim();
+            const serverBase = document.getElementById('serverUrl').value
+                .replace('wss://', 'https://').replace('ws://', 'http://').replace('/ws/transcribe', '');
+
+            try {
+                const resp = await fetch(`${serverBase}/correct`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text: allText, context: context || null }),
+                });
+                const data = await resp.json();
+
+                // Add corrected result
+                const correctedEntry = document.createElement('div');
+                correctedEntry.className = 'transcript-entry';
+                correctedEntry.style.borderLeftColor = '#4dd0e1';
+                correctedEntry.innerHTML = `
+                    <div class="correction-label">LLM補正後:</div>
+                    <div class="text">${data.text}</div>
+                    <div class="correction-label" style="margin-top: 0.5rem;">LLM補正前:</div>
+                    <div class="raw">${data.raw_text}</div>
+                    <div class="meta">LLM: ${data.llm_time_s}s</div>
+                `;
+                box.appendChild(correctedEntry);
+                box.scrollTop = box.scrollHeight;
+
+                setStatus('LLM補正完了', 'connected');
+            } catch (err) {
+                setStatus('LLM補正エラー: ' + err.message, 'disconnected');
+            }
+
+            btn.textContent = 'LLM補正';
+            btn.disabled = false;
         }
     </script>
 </body>

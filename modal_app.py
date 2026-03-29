@@ -50,12 +50,35 @@ LLM_CORRECTION_PROMPT = """\
 - 修正後のテキストのみを出力してください。説明や注釈は不要です"""
 
 
+def remove_repetition(text, min_len=5):
+    """Detect and remove repeated phrases (Whisper loop bug)."""
+    if not text or len(text) < min_len * 2:
+        return text
+    # Try finding repeated substrings of various lengths
+    for length in range(min_len, min(60, len(text) // 2) + 1):
+        for start in range(len(text) - length * 2 + 1):
+            pattern = text[start:start + length]
+            rest = text[start + length:]
+            count = 0
+            pos = 0
+            while rest[pos:pos + length] == pattern:
+                count += 1
+                pos += length
+            if count >= 2:
+                # Found 3+ repetitions, keep only the first occurrence
+                return text[:start + length] + rest[pos:]
+    return text
+
+
 def clean_transcription(text, initial_prompt=None):
-    """Remove hallucinated phrases and prompt leakage from transcription."""
+    """Remove hallucinated phrases, loops, and prompt leakage from transcription."""
     if not text or not text.strip():
         return ""
 
     cleaned = text.strip()
+
+    # Remove repetition loops
+    cleaned = remove_repetition(cleaned)
 
     # Remove prompt text that leaked into the output
     if initial_prompt:
@@ -212,6 +235,27 @@ class WhisperAPI:
                 "audio_duration_s": round(duration, 2),
             })
 
+        @web_app.post("/correct")
+        async def correct_text(request: dict):
+            """LLM post-processing endpoint: correct medical terms in transcription."""
+            import time as _time
+
+            text = request.get("text", "")
+            context = request.get("context")
+
+            if not text.strip():
+                return JSONResponse({"text": "", "llm_time_s": 0})
+
+            start = _time.time()
+            corrected = correct_with_llm(text, context)
+            elapsed = _time.time() - start
+
+            return JSONResponse({
+                "text": corrected,
+                "raw_text": text,
+                "llm_time_s": round(elapsed, 2),
+            })
+
         @web_app.websocket("/ws/transcribe")
         async def websocket_transcribe(ws: WebSocket):
             await ws.accept()
@@ -221,8 +265,6 @@ class WhisperAPI:
             buffer_seconds = config.get("buffer_seconds", 10)
             input_sample_rate = config.get("sample_rate", 16000)
             initial_prompt = config.get("initial_prompt")
-            use_llm = config.get("use_llm", False)
-            context = config.get("context")
 
             await ws.send_json({"type": "ready", "message": "Send audio chunks as binary"})
 
@@ -244,18 +286,15 @@ class WhisperAPI:
                     if len(audio_buffer) >= buffer_threshold:
                         result = self._transcribe(
                             audio_buffer, generate_kwargs, initial_prompt,
-                            use_llm=use_llm, context=context,
+                            use_llm=False,
                         )
 
                         if result["text"]:
                             await ws.send_json({
                                 "type": "transcription",
                                 "text": result["text"],
-                                "raw_text": result["raw_text"],
                                 "chunks": result["chunks"],
                                 "processing_time_s": result["processing_time_s"],
-                                "whisper_time_s": result["whisper_time_s"],
-                                "llm_time_s": result["llm_time_s"],
                                 "audio_duration_s": round(len(audio_buffer) / 16000, 2),
                             })
 
@@ -265,7 +304,6 @@ class WhisperAPI:
                 if len(audio_buffer) > 16000:
                     result = self._transcribe(
                         audio_buffer, generate_kwargs, initial_prompt,
-                        use_llm=use_llm, context=context,
                     )
                     if result["text"]:
                         print(f"Final transcription: {result['text']}", flush=True)
