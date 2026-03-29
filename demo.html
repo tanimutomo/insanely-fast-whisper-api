@@ -118,6 +118,7 @@
 
         function setPreset(key, btn) {
             document.getElementById('initialPrompt').value = PRESETS[key];
+            document.getElementById('llmContext').value = PRESETS[key];
             document.querySelectorAll('.prompt-presets button').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
         }
