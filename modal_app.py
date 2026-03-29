@@ -66,6 +66,7 @@ class WhisperAPI:
         async def transcribe_file(
             file: UploadFile = File(...),
             language: str = Form(default=None),
+            initial_prompt: str = Form(default=None),
         ):
             import librosa
 
@@ -76,6 +77,8 @@ class WhisperAPI:
             generate_kwargs = {"task": "transcribe"}
             if language:
                 generate_kwargs["language"] = language
+            if initial_prompt:
+                generate_kwargs["prompt"] = initial_prompt
 
             start = time.time()
             result = self.pipe(
@@ -102,11 +105,20 @@ class WhisperAPI:
             language = config.get("language")
             buffer_seconds = config.get("buffer_seconds", 5)
             input_sample_rate = config.get("sample_rate", 16000)
+            initial_prompt = config.get("initial_prompt")
 
             await ws.send_json({"type": "ready", "message": "Send audio chunks as binary"})
 
             audio_buffer = np.array([], dtype=np.float32)
             buffer_threshold = int(16000 * buffer_seconds)
+
+            def build_generate_kwargs():
+                kwargs = {"task": "transcribe"}
+                if language:
+                    kwargs["language"] = language
+                if initial_prompt:
+                    kwargs["prompt"] = initial_prompt
+                return kwargs
 
             try:
                 while True:
@@ -120,16 +132,12 @@ class WhisperAPI:
                     audio_buffer = np.concatenate([audio_buffer, chunk])
 
                     if len(audio_buffer) >= buffer_threshold:
-                        generate_kwargs = {"task": "transcribe"}
-                        if language:
-                            generate_kwargs["language"] = language
-
                         start = time.time()
                         result = self.pipe(
                             audio_buffer,
                             chunk_length_s=30,
                             batch_size=24,
-                            generate_kwargs=generate_kwargs,
+                            generate_kwargs=build_generate_kwargs(),
                             return_timestamps=True,
                         )
                         elapsed = time.time() - start
@@ -146,14 +154,11 @@ class WhisperAPI:
 
             except WebSocketDisconnect:
                 if len(audio_buffer) > 16000:
-                    generate_kwargs = {"task": "transcribe"}
-                    if language:
-                        generate_kwargs["language"] = language
                     result = self.pipe(
                         audio_buffer,
                         chunk_length_s=30,
                         batch_size=24,
-                        generate_kwargs=generate_kwargs,
+                        generate_kwargs=build_generate_kwargs(),
                         return_timestamps=True,
                     )
                     print(f"Final transcription: {result['text']}", flush=True)

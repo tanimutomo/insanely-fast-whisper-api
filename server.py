@@ -39,11 +39,13 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="Whisper Realtime API", lifespan=lifespan)
 
 
-def transcribe_audio(audio_array: np.ndarray, language: str | None = None) -> dict:
+def transcribe_audio(audio_array: np.ndarray, language: str | None = None, initial_prompt: str | None = None) -> dict:
     """Transcribe a numpy audio array (16kHz mono float32)."""
     generate_kwargs = {"task": "transcribe"}
     if language:
         generate_kwargs["language"] = language
+    if initial_prompt:
+        generate_kwargs["prompt"] = initial_prompt
 
     result = pipe(
         audio_array,
@@ -60,6 +62,7 @@ def transcribe_audio(audio_array: np.ndarray, language: str | None = None) -> di
 async def transcribe_file(
     file: UploadFile = File(...),
     language: str = Form(default=None),
+    initial_prompt: str = Form(default=None),
 ):
     audio_bytes = await file.read()
 
@@ -68,7 +71,7 @@ async def transcribe_file(
     audio_array, sr = librosa.load(io.BytesIO(audio_bytes), sr=SAMPLE_RATE, mono=True)
 
     start = time.time()
-    result = transcribe_audio(audio_array, language=language)
+    result = transcribe_audio(audio_array, language=language, initial_prompt=initial_prompt)
     elapsed = time.time() - start
 
     return JSONResponse({
@@ -89,6 +92,7 @@ async def websocket_transcribe(ws: WebSocket):
     language = config.get("language")
     buffer_seconds = config.get("buffer_seconds", BUFFER_SECONDS)
     input_sample_rate = config.get("sample_rate", SAMPLE_RATE)
+    initial_prompt = config.get("initial_prompt")
 
     await ws.send_json({"type": "ready", "message": "Send audio chunks as binary"})
 
@@ -112,7 +116,7 @@ async def websocket_transcribe(ws: WebSocket):
             # Transcribe when buffer is full
             if len(audio_buffer) >= buffer_threshold:
                 start = time.time()
-                result = transcribe_audio(audio_buffer, language=language)
+                result = transcribe_audio(audio_buffer, language=language, initial_prompt=initial_prompt)
                 elapsed = time.time() - start
 
                 await ws.send_json({

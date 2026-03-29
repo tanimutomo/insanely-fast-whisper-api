@@ -29,6 +29,14 @@
         .transcript-entry .meta { font-size: 0.75rem; color: #888; margin-top: 0.3rem; }
         .live-indicator { display: inline-block; width: 8px; height: 8px; background: #e94560; border-radius: 50%; margin-right: 0.5rem; animation: pulse 1s infinite; }
         @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+        .prompt-section { width: 100%; max-width: 700px; margin-bottom: 1.5rem; }
+        .prompt-section label { display: flex; flex-direction: column; gap: 0.3rem; font-size: 0.85rem; color: #aaa; }
+        .prompt-section select, .prompt-section textarea { padding: 0.5rem; border-radius: 6px; border: 1px solid #444; background: #16213e; color: #eee; font-size: 0.9rem; width: 100%; }
+        .prompt-section textarea { min-height: 80px; resize: vertical; font-family: inherit; margin-top: 0.5rem; }
+        .prompt-presets { display: flex; gap: 0.5rem; margin-top: 0.5rem; flex-wrap: wrap; }
+        .prompt-presets button { padding: 0.4rem 0.8rem; font-size: 0.8rem; background: #0f3460; color: #4dd0e1; border: 1px solid #4dd0e1; border-radius: 6px; }
+        .prompt-presets button:hover { background: #1a4a7a; }
+        .prompt-presets button.active { background: #4dd0e1; color: #1a1a2e; }
     </style>
 </head>
 <body>
@@ -55,6 +63,19 @@
         </label>
     </div>
 
+    <div class="prompt-section">
+        <label>
+            Initial Prompt（医療文脈の指定）
+            <div class="prompt-presets">
+                <button type="button" onclick="setPreset('orthopedic', this)">整形外科外来</button>
+                <button type="button" onclick="setPreset('rehab', this)">リハビリ（PT）</button>
+                <button type="button" onclick="setPreset('nursing', this)">看護記録</button>
+                <button type="button" onclick="setPreset('none', this)">なし</button>
+            </div>
+            <textarea id="initialPrompt" placeholder="自由入力: 録音の文脈や頻出する医療用語を記述してください..."></textarea>
+        </label>
+    </div>
+
     <div class="controls">
         <button id="startBtn" onclick="startRecording()">Start Recording</button>
         <button id="stopBtn" onclick="stopRecording()" disabled>Stop</button>
@@ -72,6 +93,19 @@
         let audioContext = null;
         let processor = null;
         const TARGET_SAMPLE_RATE = 16000;
+
+        const PRESETS = {
+            orthopedic: `整形外科の外来診察の記録です。医師と患者の会話が含まれます。頻出する用語: 変形性膝関節症、変形性股関節症、腰椎椎間板ヘルニア、脊柱管狭窄症、腱板断裂、大腿骨頸部骨折、橈骨遠位端骨折、上腕骨近位端骨折、前十字靱帯損傷、半月板損傷、関節リウマチ、骨粗鬆症、人工膝関節置換術、人工股関節置換術、ロキソプロフェン、セレコキシブ、エルデカルシトール、デノスマブ、テリパラチド、ROM制限、MMT、徒手検査、ラセーグ徴候、MRI、レントゲン、CT。`,
+            rehab: `理学療法士（PT）によるリハビリテーションの経過記録です。患者の身体機能評価と治療内容が含まれます。頻出する用語: 関節可動域訓練、ROM、筋力増強訓練、MMT、歩行訓練、平行棒内歩行、T字杖歩行、荷重制限、免荷、部分荷重、全荷重、ADL訓練、FIM、バーセルインデックス、バランス訓練、TUG、片脚立位、起居動作訓練、移乗動作、大腿四頭筋、ハムストリングス、中殿筋、腸腰筋、体幹筋、SLR、パテラセッティング、CKCトレーニング、OKCトレーニング、物理療法、ホットパック、超音波療法、電気刺激療法。`,
+            nursing: `看護師がベッドサイドで患者と会話しながら作成する看護記録です。バイタルサインの報告や症状の聞き取りが含まれます。頻出する用語: バイタルサイン、血圧、脈拍、体温、SpO2、呼吸数、意識レベル、JCS、GCS、疼痛評価、NRS、VAS、輸液管理、点滴、中心静脈カテーテル、末梢静脈ライン、経鼻胃管、尿道カテーテル、褥瘡、体位変換、吸引、酸素投与、血糖値、インスリン、内服確認、排泄確認、食事摂取量、清拭、入浴介助、転倒リスク、せん妄、不穏、SOAP記録。`,
+            none: '',
+        };
+
+        function setPreset(key, btn) {
+            document.getElementById('initialPrompt').value = PRESETS[key];
+            document.querySelectorAll('.prompt-presets button').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+        }
 
         function setStatus(text, className) {
             const el = document.getElementById('status');
@@ -114,6 +148,7 @@
             const serverUrl = document.getElementById('serverUrl').value;
             const language = document.getElementById('language').value;
             const bufferSeconds = parseInt(document.getElementById('bufferSeconds').value);
+            const initialPrompt = document.getElementById('initialPrompt').value.trim();
 
             document.getElementById('startBtn').disabled = true;
             document.getElementById('stopBtn').disabled = false;
@@ -144,6 +179,7 @@
                             language: language || null,
                             buffer_seconds: bufferSeconds,
                             sample_rate: TARGET_SAMPLE_RATE,
+                            initial_prompt: initialPrompt || null,
                         }));
                     };
 
