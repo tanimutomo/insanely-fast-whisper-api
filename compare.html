@@ -51,6 +51,10 @@
         .llm-result { background: #0a1628; border-radius: 6px; padding: 1rem; min-height: 100px; line-height: 1.8; font-size: 0.95rem; white-space: pre-wrap; border: 1px solid #4dd0e1; margin-top: 0.5rem; display: none; }
         .llm-label { font-size: 0.8rem; color: #4dd0e1; margin-top: 0.5rem; display: none; }
         .hidden { display: none !important; }
+        .truth-panel { max-width: 900px; margin: 1.5rem auto 0; background: #0f2c1e; border-radius: 10px; padding: 1.2rem 1.5rem; border: 1px solid #2d5a3d; }
+        .truth-panel h3 { font-size: 0.9rem; color: #66bb6a; margin-bottom: 0.6rem; display: flex; align-items: center; gap: 0.4rem; }
+        .truth-panel .truth-text { font-size: 0.9rem; line-height: 1.8; white-space: pre-wrap; color: #c8e6c9; }
+        audio.sample-audio { width: 100%; margin-top: 0.5rem; }
         @media (max-width: 768px) {
             .comparison { grid-template-columns: 1fr; }
         }
@@ -88,10 +92,27 @@
     <div class="panel-section" id="fileSection">
         <div class="input-row">
             <div style="flex:1">
-                <label>Audio File</label>
-                <input type="file" id="audioFile" accept="audio/*,.wav,.mp3,.m4a,.flac,.ogg">
+                <label>Sample (整形外科外来)</label>
+                <select id="sampleSelect" onchange="loadSample(this.value)">
+                    <option value="">-- サンプルを選択、または下で自分のファイルをアップロード --</option>
+                    <option value="spine">1. 脊椎疾患（腰痛・神経症状）</option>
+                    <option value="joint">2. 関節・変性疾患（膝・肩）</option>
+                    <option value="trauma">3. 外傷・骨折（救急・再診）</option>
+                </select>
             </div>
         </div>
+        <div class="input-row" style="margin-top: 0.8rem;">
+            <div style="flex:1">
+                <label>Audio File (アップロード)</label>
+                <input type="file" id="audioFile" accept="audio/*,.wav,.mp3,.m4a,.flac,.ogg" onchange="document.getElementById('sampleSelect').value = '';">
+            </div>
+        </div>
+        <audio id="samplePlayer" class="sample-audio hidden" controls></audio>
+    </div>
+
+    <div class="truth-panel hidden" id="truthPanel">
+        <h3>✓ 正解データ (読み上げ原文)</h3>
+        <div class="truth-text" id="truthText"></div>
     </div>
 
     <div class="controls" id="fileControls">
@@ -146,8 +167,65 @@
         const AWS_CREDENTIALS_ENDPOINT = '/api/aws-credentials';
         const TARGET_SAMPLE_RATE = 16000;
 
+        const SAMPLES = {
+            spine: {
+                label: '1. 脊椎疾患',
+                url: '/samples/01-spine.m4a',
+                filename: '01-spine.m4a',
+                truth: '主訴は慢性的な腰痛と右下肢の放散痛。L4/5レベルの腰椎椎間板ヘルニアを疑い、SLRテストを施行したところ、右側で30度陽性。大腿四頭筋の筋力低下は認めないが、右足背の知覚鈍麻を認める。まずは消炎鎮痛剤とプレガバリンの内服にて経過観察とし、改善乏しければMRI検査を検討する。',
+            },
+            joint: {
+                label: '2. 関節・変性疾患',
+                url: '/samples/02-joint.m4a',
+                filename: '02-joint.m4a',
+                truth: '左膝の内側側副靭帯沿いに圧痛あり。半月板損傷の疑い。単純X線像では大腿骨および脛骨の骨棘形成を認め、変形性膝関節症、Kellgren-Lawrence分類のグレード2と診断。関節内にヒアルロン酸の注入を行い、大腿四頭筋訓練の指導を実施した。',
+            },
+            trauma: {
+                label: '3. 外傷・骨折',
+                url: '/samples/03-trauma.m4a',
+                filename: '03-trauma.m4a',
+                truth: '転倒による左手関節の疼痛。レントゲンにて橈骨遠位端骨折を認める。背側への転位が著明なため、局所麻酔下にて徒手整復を施行。整復後のアライメントは良好。クラーメル副子にてシーネ固定を行い、後日、掌側ロッキングプレートによる骨接合術を予定する。',
+            },
+        };
+
         let currentMode = 'file';
+        let currentSampleFile = null; // File object loaded from sample
         let rt = null; // realtime state
+
+        window.loadSample = async (key) => {
+            const player = document.getElementById('samplePlayer');
+            const truthPanel = document.getElementById('truthPanel');
+            const truthText = document.getElementById('truthText');
+
+            if (!key) {
+                currentSampleFile = null;
+                player.classList.add('hidden');
+                player.removeAttribute('src');
+                truthPanel.classList.add('hidden');
+                return;
+            }
+
+            const sample = SAMPLES[key];
+            // Clear manually uploaded file so sample takes precedence
+            document.getElementById('audioFile').value = '';
+
+            truthText.textContent = sample.truth;
+            truthPanel.classList.remove('hidden');
+            player.src = sample.url;
+            player.classList.remove('hidden');
+
+            setStatus('Loading sample...', 'processing');
+            try {
+                const resp = await fetch(sample.url);
+                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                const blob = await resp.blob();
+                currentSampleFile = new File([blob], sample.filename, { type: blob.type || 'audio/mp4' });
+                setStatus(`Sample loaded: ${sample.label}`, 'done');
+            } catch (err) {
+                setStatus('Sample load failed: ' + err.message, 'error');
+                currentSampleFile = null;
+            }
+        };
 
         window.setMode = (mode) => {
             currentMode = mode;
@@ -156,6 +234,9 @@
             document.getElementById('fileSection').classList.toggle('hidden', mode !== 'file');
             document.getElementById('fileControls').classList.toggle('hidden', mode !== 'file');
             document.getElementById('realtimeControls').classList.toggle('hidden', mode !== 'realtime');
+            // Hide truth panel in realtime mode; keep visible in file mode if sample is selected
+            if (mode !== 'file') document.getElementById('truthPanel').classList.add('hidden');
+            else if (document.getElementById('sampleSelect').value) document.getElementById('truthPanel').classList.remove('hidden');
             resetResults();
         };
 
@@ -187,12 +268,11 @@
         // ========== FILE MODE ==========
         window.runFileComparison = async () => {
             const fileInput = document.getElementById('audioFile');
-            if (!fileInput.files.length) {
-                setStatus('Please select an audio file', 'error');
+            const file = fileInput.files[0] || currentSampleFile;
+            if (!file) {
+                setStatus('Please select a sample or upload an audio file', 'error');
                 return;
             }
-
-            const file = fileInput.files[0];
             const language = document.getElementById('language').value;
             const context = document.getElementById('context').value.trim();
 
