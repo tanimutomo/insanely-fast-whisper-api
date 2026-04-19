@@ -8,40 +8,53 @@
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: #1a1a2e; color: #eee; min-height: 100vh; padding: 2rem; }
         h1 { text-align: center; margin-bottom: 0.5rem; font-size: 1.5rem; }
-        .nav { text-align: center; margin-bottom: 1.5rem; }
+        .nav { text-align: center; margin-bottom: 1rem; }
         .nav a { color: #4dd0e1; font-size: 0.85rem; }
-        .upload-section { max-width: 900px; margin: 0 auto 1.5rem; }
-        .upload-section label { display: block; font-size: 0.85rem; color: #aaa; margin-bottom: 0.3rem; }
-        .upload-row { display: flex; gap: 1rem; align-items: end; flex-wrap: wrap; }
-        .upload-row input[type="file"] { flex: 1; padding: 0.5rem; border-radius: 6px; border: 1px solid #444; background: #16213e; color: #eee; font-size: 0.9rem; }
-        .upload-row select, .upload-row textarea { padding: 0.5rem; border-radius: 6px; border: 1px solid #444; background: #16213e; color: #eee; font-size: 0.9rem; }
-        .upload-row textarea { width: 100%; min-height: 50px; resize: vertical; font-family: inherit; }
+        .mode-tabs { display: flex; gap: 0; justify-content: center; margin-bottom: 1.5rem; }
+        .mode-tabs button { padding: 0.5rem 1.5rem; border: 1px solid #333; background: #16213e; color: #aaa; font-size: 0.9rem; cursor: pointer; }
+        .mode-tabs button:first-child { border-radius: 8px 0 0 8px; }
+        .mode-tabs button:last-child { border-radius: 0 8px 8px 0; }
+        .mode-tabs button.active { background: #e94560; color: white; border-color: #e94560; }
+        .panel-section { max-width: 900px; margin: 0 auto 1.5rem; }
+        .panel-section label { display: block; font-size: 0.85rem; color: #aaa; margin-bottom: 0.3rem; }
+        .input-row { display: flex; gap: 1rem; align-items: end; flex-wrap: wrap; }
+        .input-row input[type="file"], .input-row select, .input-row input[type="text"] { padding: 0.5rem; border-radius: 6px; border: 1px solid #444; background: #16213e; color: #eee; font-size: 0.9rem; }
+        .input-row input[type="file"] { flex: 1; }
+        textarea { padding: 0.5rem; border-radius: 6px; border: 1px solid #444; background: #16213e; color: #eee; font-size: 0.9rem; width: 100%; min-height: 50px; resize: vertical; font-family: inherit; }
         .context-row { margin-top: 0.8rem; }
-        .context-row label { display: flex; flex-direction: column; gap: 0.3rem; }
         button { padding: 0.7rem 2rem; border-radius: 8px; border: none; font-size: 1rem; cursor: pointer; transition: all 0.2s; }
         button:disabled { opacity: 0.4; cursor: not-allowed; }
         .btn-primary { background: #e94560; color: white; }
         .btn-primary:hover:not(:disabled) { background: #c73e54; }
+        .btn-secondary { background: #444; color: white; }
+        .btn-secondary:hover:not(:disabled) { background: #666; }
         .btn-llm { background: #0f3460; color: #4dd0e1; border: 1px solid #4dd0e1; padding: 0.5rem 1.5rem; font-size: 0.9rem; }
         .btn-llm:hover:not(:disabled) { background: #1a4a7a; }
-        .controls { text-align: center; margin: 1rem 0; }
+        .controls { text-align: center; margin: 1rem 0; display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; }
         .status { text-align: center; margin-bottom: 1rem; padding: 0.5rem 1rem; border-radius: 6px; font-size: 0.85rem; display: inline-block; }
         .status-row { text-align: center; margin-bottom: 1rem; }
         .status.processing { background: #1b2e1b; color: #66bb6a; }
         .status.done { background: #0f3460; color: #4dd0e1; }
         .status.error { background: #2d1b2e; color: #e94560; }
+        .status.recording { background: #1b2e1b; color: #66bb6a; }
         .comparison { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; max-width: 900px; margin: 0 auto; }
         .panel { background: #16213e; border-radius: 10px; padding: 1.5rem; border: 1px solid #333; }
         .panel h2 { font-size: 1rem; margin-bottom: 0.8rem; display: flex; align-items: center; gap: 0.5rem; }
         .panel h2 .badge { font-size: 0.7rem; padding: 0.2rem 0.5rem; border-radius: 4px; }
         .badge-whisper { background: #e94560; color: white; }
         .badge-transcribe { background: #f5a623; color: #1a1a2e; }
-        .result-box { background: #1a1a2e; border-radius: 6px; padding: 1rem; min-height: 150px; line-height: 1.8; font-size: 0.95rem; white-space: pre-wrap; }
+        .result-box { background: #1a1a2e; border-radius: 6px; padding: 1rem; min-height: 150px; max-height: 400px; overflow-y: auto; line-height: 1.8; font-size: 0.95rem; white-space: pre-wrap; }
         .result-box.placeholder { color: #666; display: flex; align-items: center; justify-content: center; }
+        .result-box .partial { color: #888; font-style: italic; }
         .meta { font-size: 0.75rem; color: #888; margin-top: 0.5rem; }
         .llm-row { margin-top: 0.8rem; }
         .llm-result { background: #0a1628; border-radius: 6px; padding: 1rem; min-height: 100px; line-height: 1.8; font-size: 0.95rem; white-space: pre-wrap; border: 1px solid #4dd0e1; margin-top: 0.5rem; display: none; }
         .llm-label { font-size: 0.8rem; color: #4dd0e1; margin-top: 0.5rem; display: none; }
+        .hidden { display: none !important; }
+        .truth-panel { max-width: 900px; margin: 1.5rem auto 0; background: #0f2c1e; border-radius: 10px; padding: 1.2rem 1.5rem; border: 1px solid #2d5a3d; }
+        .truth-panel h3 { font-size: 0.9rem; color: #66bb6a; margin-bottom: 0.6rem; display: flex; align-items: center; gap: 0.4rem; }
+        .truth-panel .truth-text { font-size: 0.9rem; line-height: 1.8; white-space: pre-wrap; color: #c8e6c9; }
+        audio.sample-audio { width: 100%; margin-top: 0.5rem; }
         @media (max-width: 768px) {
             .comparison { grid-template-columns: 1fr; }
         }
@@ -51,18 +64,19 @@
     <h1>ASR Accuracy Comparison</h1>
     <div class="nav"><a href="/">Realtime Demo</a></div>
 
-    <div class="upload-section">
-        <div class="upload-row">
-            <div style="flex:1">
-                <label>Audio File</label>
-                <input type="file" id="audioFile" accept="audio/*,.wav,.mp3,.m4a,.flac,.ogg">
-            </div>
+    <div class="mode-tabs">
+        <button id="modeFile" class="active" onclick="setMode('file')">📁 File Upload</button>
+        <button id="modeRealtime" onclick="setMode('realtime')">🎤 Realtime</button>
+    </div>
+
+    <!-- Shared context/language controls -->
+    <div class="panel-section">
+        <div class="input-row">
             <div>
                 <label>Language</label>
                 <select id="language">
                     <option value="ja">Japanese</option>
                     <option value="en">English</option>
-                    <option value="">Auto</option>
                 </select>
             </div>
         </div>
@@ -74,8 +88,41 @@
         </div>
     </div>
 
-    <div class="controls">
-        <button class="btn-primary" id="transcribeBtn" onclick="runComparison()">Transcribe</button>
+    <!-- File upload controls -->
+    <div class="panel-section" id="fileSection">
+        <div class="input-row">
+            <div style="flex:1">
+                <label>Sample (整形外科外来)</label>
+                <select id="sampleSelect" onchange="loadSample(this.value)">
+                    <option value="">-- サンプルを選択、または下で自分のファイルをアップロード --</option>
+                    <option value="spine">1. 脊椎疾患（腰痛・神経症状）</option>
+                    <option value="joint">2. 関節・変性疾患（膝・肩）</option>
+                    <option value="trauma">3. 外傷・骨折（救急・再診）</option>
+                </select>
+            </div>
+        </div>
+        <div class="input-row" style="margin-top: 0.8rem;">
+            <div style="flex:1">
+                <label>Audio File (アップロード)</label>
+                <input type="file" id="audioFile" accept="audio/*,.wav,.mp3,.m4a,.flac,.ogg" onchange="document.getElementById('sampleSelect').value = '';">
+            </div>
+        </div>
+        <audio id="samplePlayer" class="sample-audio hidden" controls></audio>
+    </div>
+
+    <div class="truth-panel hidden" id="truthPanel">
+        <h3>✓ 正解データ (読み上げ原文)</h3>
+        <div class="truth-text" id="truthText"></div>
+    </div>
+
+    <div class="controls" id="fileControls">
+        <button class="btn-primary" id="transcribeBtn" onclick="runFileComparison()">Transcribe</button>
+    </div>
+
+    <!-- Realtime controls -->
+    <div class="controls hidden" id="realtimeControls">
+        <button class="btn-primary" id="startBtn" onclick="startRealtime()">Start Recording</button>
+        <button class="btn-secondary" id="stopBtn" onclick="stopRealtime()" disabled>Stop</button>
     </div>
 
     <div class="status-row">
@@ -83,10 +130,9 @@
     </div>
 
     <div class="comparison">
-        <!-- Whisper Panel -->
         <div class="panel">
             <h2><span class="badge badge-whisper">Whisper</span> Large V3 + GPU</h2>
-            <div class="result-box placeholder" id="whisperResult">Upload audio to see results</div>
+            <div class="result-box placeholder" id="whisperResult">Select mode and start</div>
             <div class="meta" id="whisperMeta"></div>
             <div class="llm-row">
                 <button class="btn-llm" id="whisperLlmBtn" onclick="correctWithLLM('whisper')" disabled>LLM補正</button>
@@ -96,10 +142,9 @@
             </div>
         </div>
 
-        <!-- Amazon Transcribe Panel -->
         <div class="panel">
             <h2><span class="badge badge-transcribe">Transcribe</span> Amazon + Custom Vocab</h2>
-            <div class="result-box placeholder" id="transcribeResult">Coming soon - AWS credentials required</div>
+            <div class="result-box placeholder" id="transcribeResult">Select mode and start</div>
             <div class="meta" id="transcribeMeta"></div>
             <div class="llm-row">
                 <button class="btn-llm" id="transcribeLlmBtn" onclick="correctWithLLM('transcribe')" disabled>LLM補正</button>
@@ -110,71 +155,385 @@
         </div>
     </div>
 
-    <script>
+    <script type="module">
+        import {
+            TranscribeStreamingClient,
+            StartStreamTranscriptionCommand,
+        } from 'https://esm.sh/@aws-sdk/client-transcribe-streaming@3.1032.0';
+
         const MODAL_BASE = 'https://tanimutomo--whisper-realtime-api-whisperapi-web.modal.run';
+        const MODAL_WS = 'wss://tanimutomo--whisper-realtime-api-whisperapi-web.modal.run/ws/transcribe';
+        const AWS_TRANSCRIBE_ENDPOINT = '/api/transcribe-aws';
+        const AWS_CREDENTIALS_ENDPOINT = '/api/aws-credentials';
+        const TARGET_SAMPLE_RATE = 16000;
+
+        const SAMPLES = {
+            spine: {
+                label: '1. 脊椎疾患',
+                url: '/samples/01-spine.m4a',
+                filename: '01-spine.m4a',
+                truth: '主訴は慢性的な腰痛と右下肢の放散痛。L4/5レベルの腰椎椎間板ヘルニアを疑い、SLRテストを施行したところ、右側で30度陽性。大腿四頭筋の筋力低下は認めないが、右足背の知覚鈍麻を認める。まずは消炎鎮痛剤とプレガバリンの内服にて経過観察とし、改善乏しければMRI検査を検討する。',
+            },
+            joint: {
+                label: '2. 関節・変性疾患',
+                url: '/samples/02-joint.m4a',
+                filename: '02-joint.m4a',
+                truth: '左膝の内側側副靭帯沿いに圧痛あり。半月板損傷の疑い。単純X線像では大腿骨および脛骨の骨棘形成を認め、変形性膝関節症、Kellgren-Lawrence分類のグレード2と診断。関節内にヒアルロン酸の注入を行い、大腿四頭筋訓練の指導を実施した。',
+            },
+            trauma: {
+                label: '3. 外傷・骨折',
+                url: '/samples/03-trauma.m4a',
+                filename: '03-trauma.m4a',
+                truth: '転倒による左手関節の疼痛。レントゲンにて橈骨遠位端骨折を認める。背側への転位が著明なため、局所麻酔下にて徒手整復を施行。整復後のアライメントは良好。クラーメル副子にてシーネ固定を行い、後日、掌側ロッキングプレートによる骨接合術を予定する。',
+            },
+        };
+
+        let currentMode = 'file';
+        let currentSampleFile = null; // File object loaded from sample
+        let rt = null; // realtime state
+
+        window.loadSample = async (key) => {
+            const player = document.getElementById('samplePlayer');
+            const truthPanel = document.getElementById('truthPanel');
+            const truthText = document.getElementById('truthText');
+
+            if (!key) {
+                currentSampleFile = null;
+                player.classList.add('hidden');
+                player.removeAttribute('src');
+                truthPanel.classList.add('hidden');
+                return;
+            }
+
+            const sample = SAMPLES[key];
+            // Clear manually uploaded file so sample takes precedence
+            document.getElementById('audioFile').value = '';
+
+            truthText.textContent = sample.truth;
+            truthPanel.classList.remove('hidden');
+            player.src = sample.url;
+            player.classList.remove('hidden');
+
+            setStatus('Loading sample...', 'processing');
+            try {
+                const resp = await fetch(sample.url);
+                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                const blob = await resp.blob();
+                currentSampleFile = new File([blob], sample.filename, { type: blob.type || 'audio/mp4' });
+                setStatus(`Sample loaded: ${sample.label}`, 'done');
+            } catch (err) {
+                setStatus('Sample load failed: ' + err.message, 'error');
+                currentSampleFile = null;
+            }
+        };
+
+        window.setMode = (mode) => {
+            currentMode = mode;
+            document.getElementById('modeFile').classList.toggle('active', mode === 'file');
+            document.getElementById('modeRealtime').classList.toggle('active', mode === 'realtime');
+            document.getElementById('fileSection').classList.toggle('hidden', mode !== 'file');
+            document.getElementById('fileControls').classList.toggle('hidden', mode !== 'file');
+            document.getElementById('realtimeControls').classList.toggle('hidden', mode !== 'realtime');
+            // Hide truth panel in realtime mode; keep visible in file mode if sample is selected
+            if (mode !== 'file') document.getElementById('truthPanel').classList.add('hidden');
+            else if (document.getElementById('sampleSelect').value) document.getElementById('truthPanel').classList.remove('hidden');
+            resetResults();
+        };
 
         function setStatus(text, className) {
             const el = document.getElementById('status');
             el.textContent = text;
-            el.className = 'status ' + className;
+            el.className = 'status ' + (className || '');
             el.style.display = text ? 'inline-block' : 'none';
         }
 
-        async function runComparison() {
+        function resetResults() {
+            for (const id of ['whisperResult', 'transcribeResult']) {
+                const el = document.getElementById(id);
+                el.textContent = currentMode === 'file' ? 'Upload audio to see results' : 'Press Start to begin';
+                el.className = 'result-box placeholder';
+                delete el.dataset.rawText;
+            }
+            for (const id of ['whisperMeta', 'transcribeMeta']) {
+                document.getElementById(id).textContent = '';
+            }
+            document.getElementById('whisperLlmBtn').disabled = true;
+            document.getElementById('transcribeLlmBtn').disabled = true;
+            document.getElementById('whisperLlmResult').style.display = 'none';
+            document.getElementById('transcribeLlmResult').style.display = 'none';
+            document.getElementById('whisperLlmLabel').style.display = 'none';
+            document.getElementById('transcribeLlmLabel').style.display = 'none';
+        }
+
+        // ========== FILE MODE ==========
+        window.runFileComparison = async () => {
             const fileInput = document.getElementById('audioFile');
-            if (!fileInput.files.length) {
-                setStatus('Please select an audio file', 'error');
+            const file = fileInput.files[0] || currentSampleFile;
+            if (!file) {
+                setStatus('Please select a sample or upload an audio file', 'error');
                 return;
             }
-
-            const file = fileInput.files[0];
             const language = document.getElementById('language').value;
             const context = document.getElementById('context').value.trim();
 
             document.getElementById('transcribeBtn').disabled = true;
-            setStatus('Whisper processing...', 'processing');
-
-            // Reset results
+            setStatus('Whisper + Amazon Transcribe processing...', 'processing');
+            resetResults();
             document.getElementById('whisperResult').textContent = '';
             document.getElementById('whisperResult').className = 'result-box';
-            document.getElementById('whisperMeta').textContent = '';
-            document.getElementById('whisperLlmBtn').disabled = true;
+            document.getElementById('transcribeResult').textContent = '';
+            document.getElementById('transcribeResult').className = 'result-box';
 
-            // --- Whisper ---
-            try {
-                const formData = new FormData();
-                formData.append('file', file);
-                if (language) formData.append('language', language);
-                if (context) formData.append('initial_prompt', context);
+            const whisperPromise = (async () => {
+                try {
+                    const formData = new FormData();
+                    formData.append('file', file);
+                    if (language) formData.append('language', language);
+                    if (context) formData.append('initial_prompt', context);
 
-                const resp = await fetch(`${MODAL_BASE}/transcribe`, {
-                    method: 'POST',
-                    body: formData,
-                });
-                const data = await resp.json();
+                    const resp = await fetch(`${MODAL_BASE}/transcribe`, { method: 'POST', body: formData });
+                    if (!resp.ok) throw new Error(`HTTP ${resp.status} ${resp.statusText}`);
+                    const data = await resp.json();
+                    document.getElementById('whisperResult').textContent = data.text;
+                    document.getElementById('whisperMeta').textContent =
+                        `Processing: ${data.processing_time_s}s | Audio: ${data.audio_duration_s}s`;
+                    document.getElementById('whisperLlmBtn').disabled = false;
+                    document.getElementById('whisperResult').dataset.rawText = data.text;
+                } catch (err) {
+                    console.error('Whisper error:', err);
+                    document.getElementById('whisperResult').textContent =
+                        `Error (${err.name}): ${err.message}\nEndpoint: ${MODAL_BASE}/transcribe\nCheck browser console for details.`;
+                }
+            })();
 
-                document.getElementById('whisperResult').textContent = data.text;
-                document.getElementById('whisperMeta').textContent =
-                    `Processing: ${data.processing_time_s}s | Audio: ${data.audio_duration_s}s`;
-                document.getElementById('whisperLlmBtn').disabled = false;
+            const transcribePromise = (async () => {
+                try {
+                    const awsLang = language === 'ja' ? 'ja-JP' : language === 'en' ? 'en-US' : 'ja-JP';
+                    const resp = await fetch(AWS_TRANSCRIBE_ENDPOINT, {
+                        method: 'POST',
+                        headers: { 'Content-Type': file.type || 'audio/webm', 'X-Language': awsLang },
+                        body: file,
+                    });
+                    const data = await resp.json();
+                    if (!resp.ok) throw new Error(data.error || `HTTP ${resp.status}`);
 
-                // Store raw text for LLM correction
-                document.getElementById('whisperResult').dataset.rawText = data.text;
-            } catch (err) {
-                document.getElementById('whisperResult').textContent = 'Error: ' + err.message;
-                document.getElementById('whisperResult').className = 'result-box';
-            }
+                    document.getElementById('transcribeResult').textContent = data.text;
+                    document.getElementById('transcribeMeta').textContent =
+                        `Processing: ${data.processing_time_s}s | Vocab: ${data.vocabulary}`;
+                    document.getElementById('transcribeLlmBtn').disabled = false;
+                    document.getElementById('transcribeResult').dataset.rawText = data.text;
+                } catch (err) {
+                    document.getElementById('transcribeResult').textContent = 'Error: ' + err.message;
+                }
+            })();
 
-            // --- Amazon Transcribe (placeholder) ---
-            // TODO: Implement when AWS credentials are available
-            // setStatus('Amazon Transcribe processing...', 'processing');
-            // const transcribeResp = await fetch(`${MODAL_BASE}/transcribe-aws`, ...);
+            await Promise.allSettled([whisperPromise, transcribePromise]);
 
             setStatus('Done', 'done');
             document.getElementById('transcribeBtn').disabled = false;
+        };
+
+        // ========== REALTIME MODE ==========
+        function downsample(buffer, inRate, outRate) {
+            if (inRate === outRate) return buffer;
+            const ratio = inRate / outRate;
+            const out = new Float32Array(Math.round(buffer.length / ratio));
+            for (let i = 0; i < out.length; i++) {
+                out[i] = buffer[Math.min(Math.round(i * ratio), buffer.length - 1)];
+            }
+            return out;
         }
 
-        async function correctWithLLM(engine) {
+        function f32ToI16(f32) {
+            const out = new Int16Array(f32.length);
+            for (let i = 0; i < f32.length; i++) {
+                const s = Math.max(-1, Math.min(1, f32[i]));
+                out[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+            }
+            return out;
+        }
+
+        class AudioQueue {
+            constructor() { this.chunks = []; this.resolvers = []; this.closed = false; }
+            push(chunk) {
+                if (this.resolvers.length) this.resolvers.shift()({ value: chunk, done: false });
+                else this.chunks.push(chunk);
+            }
+            close() {
+                this.closed = true;
+                while (this.resolvers.length) this.resolvers.shift()({ value: undefined, done: true });
+            }
+            [Symbol.asyncIterator]() { return this; }
+            next() {
+                if (this.chunks.length) return Promise.resolve({ value: this.chunks.shift(), done: false });
+                if (this.closed) return Promise.resolve({ value: undefined, done: true });
+                return new Promise(r => this.resolvers.push(r));
+            }
+        }
+
+        window.startRealtime = async () => {
+            document.getElementById('startBtn').disabled = true;
+            document.getElementById('stopBtn').disabled = false;
+            resetResults();
+
+            const whisperEl = document.getElementById('whisperResult');
+            const transcribeEl = document.getElementById('transcribeResult');
+            whisperEl.textContent = '';
+            whisperEl.className = 'result-box';
+            transcribeEl.textContent = '';
+            transcribeEl.className = 'result-box';
+
+            rt = { mediaStream: null, ws: null, audioCtx: null, processor: null, awsQueue: null, awsAbort: null, awsPartial: '', awsFinal: '' };
+
+            try {
+                setStatus('Requesting mic + fetching AWS credentials...', 'processing');
+                const language = document.getElementById('language').value;
+                const awsLang = language === 'ja' ? 'ja-JP' : language === 'en' ? 'en-US' : 'ja-JP';
+                const initialPrompt = document.getElementById('context').value.trim();
+
+                // 1. Mic
+                rt.mediaStream = await navigator.mediaDevices.getUserMedia({
+                    audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true },
+                });
+
+                // 2. AWS temp credentials
+                const credResp = await fetch(AWS_CREDENTIALS_ENDPOINT);
+                const credData = await credResp.json();
+                if (!credResp.ok) throw new Error(credData.error || 'credentials fetch failed');
+
+                // 3. Modal WebSocket (Whisper)
+                setStatus('Connecting to Whisper (Modal, cold start ~30s)...', 'processing');
+                await new Promise((resolve, reject) => {
+                    rt.ws = new WebSocket(MODAL_WS);
+                    rt.ws.binaryType = 'arraybuffer';
+                    const t = setTimeout(() => { rt.ws.close(); reject(new Error('Whisper WS timeout')); }, 60000);
+                    rt.ws.onopen = () => {
+                        rt.ws.send(JSON.stringify({
+                            language: language || null,
+                            buffer_seconds: 10,
+                            sample_rate: TARGET_SAMPLE_RATE,
+                            initial_prompt: initialPrompt || null,
+                        }));
+                    };
+                    rt.ws.onmessage = (ev) => {
+                        const data = JSON.parse(ev.data);
+                        if (data.type === 'ready') { clearTimeout(t); resolve(); }
+                        else if (data.type === 'transcription') {
+                            whisperEl.textContent += data.text;
+                            document.getElementById('whisperMeta').textContent =
+                                `Last chunk: ${data.processing_time_s}s | ${data.audio_duration_s}s audio`;
+                        }
+                    };
+                    rt.ws.onerror = () => { clearTimeout(t); reject(new Error('Whisper WS error')); };
+                    rt.ws.onclose = () => {};
+                });
+
+                // 4. Start AWS Transcribe streaming
+                rt.awsQueue = new AudioQueue();
+                rt.awsAbort = new AbortController();
+                const awsClient = new TranscribeStreamingClient({
+                    region: credData.region,
+                    credentials: {
+                        accessKeyId: credData.accessKeyId,
+                        secretAccessKey: credData.secretAccessKey,
+                        sessionToken: credData.sessionToken,
+                    },
+                });
+
+                async function* audioSource() {
+                    for await (const chunk of rt.awsQueue) {
+                        yield { AudioEvent: { AudioChunk: chunk } };
+                    }
+                }
+
+                const awsCommand = new StartStreamTranscriptionCommand({
+                    LanguageCode: awsLang,
+                    MediaEncoding: 'pcm',
+                    MediaSampleRateHertz: TARGET_SAMPLE_RATE,
+                    VocabularyName: credData.vocabularyName,
+                    AudioStream: audioSource(),
+                });
+
+                const awsPromise = (async () => {
+                    try {
+                        const resp = await awsClient.send(awsCommand, { abortSignal: rt.awsAbort.signal });
+                        for await (const evt of resp.TranscriptResultStream) {
+                            if (evt.TranscriptEvent) {
+                                const results = evt.TranscriptEvent.Transcript?.Results || [];
+                                for (const r of results) {
+                                    const t = r.Alternatives?.[0]?.Transcript || '';
+                                    if (r.IsPartial) {
+                                        rt.awsPartial = t;
+                                    } else {
+                                        rt.awsFinal += t;
+                                        rt.awsPartial = '';
+                                    }
+                                }
+                                transcribeEl.innerHTML = rt.awsFinal + (rt.awsPartial ? `<span class="partial">${rt.awsPartial}</span>` : '');
+                                document.getElementById('transcribeMeta').textContent = `Vocab: ${credData.vocabularyName}`;
+                            }
+                        }
+                    } catch (err) {
+                        if (err.name !== 'AbortError') {
+                            console.error('Transcribe stream error', err);
+                            transcribeEl.textContent += `\n[Error: ${err.message}]`;
+                        }
+                    }
+                })();
+
+                // 5. Audio processing — fan out to both
+                rt.audioCtx = new AudioContext();
+                const nativeRate = rt.audioCtx.sampleRate;
+                const source = rt.audioCtx.createMediaStreamSource(rt.mediaStream);
+                rt.processor = rt.audioCtx.createScriptProcessor(4096, 1, 1);
+                rt.processor.onaudioprocess = (e) => {
+                    const f32 = e.inputBuffer.getChannelData(0);
+                    const down = downsample(f32, nativeRate, TARGET_SAMPLE_RATE);
+                    const i16 = f32ToI16(down);
+                    if (rt.ws && rt.ws.readyState === WebSocket.OPEN) rt.ws.send(i16.buffer);
+                    if (rt.awsQueue && !rt.awsQueue.closed) rt.awsQueue.push(new Uint8Array(i16.buffer));
+                };
+                source.connect(rt.processor);
+                rt.processor.connect(rt.audioCtx.destination);
+
+                setStatus('🔴 Recording... (both engines streaming)', 'recording');
+                rt.awsPromise = awsPromise;
+            } catch (err) {
+                setStatus('Error: ' + err.message, 'error');
+                console.error(err);
+                window.stopRealtime();
+            }
+        };
+
+        window.stopRealtime = () => {
+            if (!rt) return;
+            if (rt.processor) { try { rt.processor.disconnect(); } catch {} rt.processor = null; }
+            if (rt.audioCtx) { try { rt.audioCtx.close(); } catch {} rt.audioCtx = null; }
+            if (rt.awsQueue) rt.awsQueue.close();
+            if (rt.awsAbort) rt.awsAbort.abort();
+            if (rt.ws) { try { rt.ws.close(); } catch {} rt.ws = null; }
+            if (rt.mediaStream) { rt.mediaStream.getTracks().forEach(t => t.stop()); rt.mediaStream = null; }
+
+            const whisperText = document.getElementById('whisperResult').textContent;
+            if (whisperText) {
+                document.getElementById('whisperResult').dataset.rawText = whisperText;
+                document.getElementById('whisperLlmBtn').disabled = false;
+            }
+            const transcribeText = (rt.awsFinal || document.getElementById('transcribeResult').textContent || '').trim();
+            if (transcribeText) {
+                document.getElementById('transcribeResult').textContent = transcribeText;
+                document.getElementById('transcribeResult').dataset.rawText = transcribeText;
+                document.getElementById('transcribeLlmBtn').disabled = false;
+            }
+
+            document.getElementById('startBtn').disabled = false;
+            document.getElementById('stopBtn').disabled = true;
+            setStatus('Stopped', 'done');
+            rt = null;
+        };
+
+        // ========== LLM CORRECTION ==========
+        window.correctWithLLM = async (engine) => {
             const btn = document.getElementById(`${engine}LlmBtn`);
             const resultEl = document.getElementById(`${engine}LlmResult`);
             const labelEl = document.getElementById(`${engine}LlmLabel`);
@@ -183,7 +542,6 @@
             const context = document.getElementById('context').value.trim();
 
             if (!rawText) return;
-
             btn.disabled = true;
             btn.textContent = 'LLM補正中...';
 
@@ -194,7 +552,6 @@
                     body: JSON.stringify({ text: rawText, context: context || null }),
                 });
                 const data = await resp.json();
-
                 resultEl.textContent = data.text;
                 resultEl.style.display = 'block';
                 labelEl.style.display = 'block';
@@ -207,7 +564,7 @@
 
             btn.textContent = 'LLM補正';
             btn.disabled = false;
-        }
+        };
     </script>
 </body>
 </html>

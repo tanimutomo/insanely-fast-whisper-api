@@ -200,13 +200,28 @@ class WhisperAPI:
         from fastapi.responses import JSONResponse
         from fastapi.middleware.cors import CORSMiddleware
 
+        from fastapi import Request
+
         web_app = FastAPI(title="Whisper Realtime API")
         web_app.add_middleware(
             CORSMiddleware,
             allow_origins=["*"],
             allow_methods=["*"],
             allow_headers=["*"],
+            expose_headers=["*"],
         )
+
+        @web_app.exception_handler(Exception)
+        async def catch_all_exceptions(request: Request, exc: Exception):
+            """Ensure unhandled errors still get CORS headers so the browser
+            surfaces the real server-side message instead of a CORS mask."""
+            import traceback
+            traceback.print_exc()
+            return JSONResponse(
+                status_code=500,
+                content={"error": f"{type(exc).__name__}: {exc}"},
+                headers={"Access-Control-Allow-Origin": "*"},
+            )
 
         @web_app.get("/health")
         async def health():
@@ -221,9 +236,31 @@ class WhisperAPI:
             context: str = Form(default=None),
         ):
             import librosa
+            import tempfile
+            import os
 
             audio_bytes = await file.read()
-            audio_array, sr = librosa.load(io.BytesIO(audio_bytes), sr=16000, mono=True)
+
+            # librosa.load(BytesIO) only works for libsndfile formats (wav/flac/ogg).
+            # For mp3/m4a/webm/opus it needs a file path so the audioread/ffmpeg
+            # fallback can kick in. Write to a temp file to cover both cases.
+            suffix = os.path.splitext(file.filename or "")[1] or ".bin"
+            with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
+                tmp.write(audio_bytes)
+                tmp_path = tmp.name
+            try:
+                audio_array, sr = librosa.load(tmp_path, sr=16000, mono=True)
+            except Exception as e:
+                return JSONResponse(
+                    status_code=400,
+                    content={"error": f"Failed to decode audio ({type(e).__name__}): {e}"},
+                )
+            finally:
+                try:
+                    os.unlink(tmp_path)
+                except OSError:
+                    pass
+
             duration = len(audio_array) / 16000
 
             generate_kwargs = self._build_generate_kwargs(language, initial_prompt)
