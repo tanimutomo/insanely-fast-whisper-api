@@ -99,7 +99,7 @@
         <!-- Amazon Transcribe Panel -->
         <div class="panel">
             <h2><span class="badge badge-transcribe">Transcribe</span> Amazon + Custom Vocab</h2>
-            <div class="result-box placeholder" id="transcribeResult">Coming soon - AWS credentials required</div>
+            <div class="result-box placeholder" id="transcribeResult">Upload audio to see results</div>
             <div class="meta" id="transcribeMeta"></div>
             <div class="llm-row">
                 <button class="btn-llm" id="transcribeLlmBtn" onclick="correctWithLLM('transcribe')" disabled>LLM補正</button>
@@ -112,6 +112,7 @@
 
     <script>
         const MODAL_BASE = 'https://tanimutomo--whisper-realtime-api-whisperapi-web.modal.run';
+        const AWS_TRANSCRIBE_ENDPOINT = '/api/transcribe-aws';
 
         function setStatus(text, className) {
             const el = document.getElementById('status');
@@ -132,7 +133,7 @@
             const context = document.getElementById('context').value.trim();
 
             document.getElementById('transcribeBtn').disabled = true;
-            setStatus('Whisper processing...', 'processing');
+            setStatus('Whisper + Amazon Transcribe processing...', 'processing');
 
             // Reset results
             document.getElementById('whisperResult').textContent = '';
@@ -140,35 +141,59 @@
             document.getElementById('whisperMeta').textContent = '';
             document.getElementById('whisperLlmBtn').disabled = true;
 
-            // --- Whisper ---
-            try {
-                const formData = new FormData();
-                formData.append('file', file);
-                if (language) formData.append('language', language);
-                if (context) formData.append('initial_prompt', context);
+            document.getElementById('transcribeResult').textContent = '';
+            document.getElementById('transcribeResult').className = 'result-box';
+            document.getElementById('transcribeMeta').textContent = '';
+            document.getElementById('transcribeLlmBtn').disabled = true;
 
-                const resp = await fetch(`${MODAL_BASE}/transcribe`, {
-                    method: 'POST',
-                    body: formData,
-                });
-                const data = await resp.json();
+            const whisperPromise = (async () => {
+                try {
+                    const formData = new FormData();
+                    formData.append('file', file);
+                    if (language) formData.append('language', language);
+                    if (context) formData.append('initial_prompt', context);
 
-                document.getElementById('whisperResult').textContent = data.text;
-                document.getElementById('whisperMeta').textContent =
-                    `Processing: ${data.processing_time_s}s | Audio: ${data.audio_duration_s}s`;
-                document.getElementById('whisperLlmBtn').disabled = false;
+                    const resp = await fetch(`${MODAL_BASE}/transcribe`, {
+                        method: 'POST',
+                        body: formData,
+                    });
+                    const data = await resp.json();
 
-                // Store raw text for LLM correction
-                document.getElementById('whisperResult').dataset.rawText = data.text;
-            } catch (err) {
-                document.getElementById('whisperResult').textContent = 'Error: ' + err.message;
-                document.getElementById('whisperResult').className = 'result-box';
-            }
+                    document.getElementById('whisperResult').textContent = data.text;
+                    document.getElementById('whisperMeta').textContent =
+                        `Processing: ${data.processing_time_s}s | Audio: ${data.audio_duration_s}s`;
+                    document.getElementById('whisperLlmBtn').disabled = false;
+                    document.getElementById('whisperResult').dataset.rawText = data.text;
+                } catch (err) {
+                    document.getElementById('whisperResult').textContent = 'Error: ' + err.message;
+                }
+            })();
 
-            // --- Amazon Transcribe (placeholder) ---
-            // TODO: Implement when AWS credentials are available
-            // setStatus('Amazon Transcribe processing...', 'processing');
-            // const transcribeResp = await fetch(`${MODAL_BASE}/transcribe-aws`, ...);
+            const transcribePromise = (async () => {
+                try {
+                    const awsLang = language === 'ja' ? 'ja-JP' : language === 'en' ? 'en-US' : 'ja-JP';
+                    const resp = await fetch(AWS_TRANSCRIBE_ENDPOINT, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': file.type || 'audio/webm',
+                            'X-Language': awsLang,
+                        },
+                        body: file,
+                    });
+                    const data = await resp.json();
+                    if (!resp.ok) throw new Error(data.error || `HTTP ${resp.status}`);
+
+                    document.getElementById('transcribeResult').textContent = data.text;
+                    document.getElementById('transcribeMeta').textContent =
+                        `Processing: ${data.processing_time_s}s | Vocab: ${data.vocabulary}`;
+                    document.getElementById('transcribeLlmBtn').disabled = false;
+                    document.getElementById('transcribeResult').dataset.rawText = data.text;
+                } catch (err) {
+                    document.getElementById('transcribeResult').textContent = 'Error: ' + err.message;
+                }
+            })();
+
+            await Promise.allSettled([whisperPromise, transcribePromise]);
 
             setStatus('Done', 'done');
             document.getElementById('transcribeBtn').disabled = false;
