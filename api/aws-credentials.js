@@ -1,8 +1,10 @@
 const { awsCredentialsProvider } = require("@vercel/oidc-aws-credentials-provider");
 
-const ROLE_ARN = process.env.AWS_ROLE_ARN;
-const REGION = process.env.AWS_REGION || "ap-northeast-1";
-const VOCABULARY = process.env.TRANSCRIBE_VOCABULARY_NAME || "medical-terms-ja";
+// Trim whitespace defensively — env values set via `echo | vercel env add`
+// can carry a trailing newline that breaks the AWS SDK's hostname builder.
+const ROLE_ARN = (process.env.AWS_ROLE_ARN || "").trim();
+const REGION = (process.env.AWS_REGION || "ap-northeast-1").trim();
+const VOCABULARY = (process.env.TRANSCRIBE_VOCABULARY_NAME || "medical-terms-ja").trim();
 
 // Short-lived credentials for browser-side Amazon Transcribe Streaming.
 // The IAM role trust policy restricts to Vercel OIDC for this project, and

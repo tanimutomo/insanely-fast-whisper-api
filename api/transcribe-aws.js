@@ -12,10 +12,10 @@ const {
 const { awsCredentialsProvider } = require("@vercel/oidc-aws-credentials-provider");
 const crypto = require("crypto");
 
-const REGION = process.env.AWS_REGION || "ap-northeast-1";
-const ROLE_ARN = process.env.AWS_ROLE_ARN;
-const BUCKET = process.env.TRANSCRIBE_S3_BUCKET;
-const VOCABULARY = process.env.TRANSCRIBE_VOCABULARY_NAME || "medical-terms-ja";
+const REGION = (process.env.AWS_REGION || "ap-northeast-1").trim();
+const ROLE_ARN = (process.env.AWS_ROLE_ARN || "").trim();
+const BUCKET = (process.env.TRANSCRIBE_S3_BUCKET || "").trim();
+const VOCABULARY = (process.env.TRANSCRIBE_VOCABULARY_NAME || "medical-terms-ja").trim();
 
 const credentials = awsCredentialsProvider({ roleArn: ROLE_ARN });
 const s3 = new S3Client({ region: REGION, credentials });
